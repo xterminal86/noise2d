@@ -1,13 +1,7 @@
 import math;
 import random;
 
-from enum import Enum, auto;
-
-################################################################################
-
-class Interpolation(Enum):
-  LINEAR = auto()
-  COSINE = auto()
+from utils import Interpolation;
 
 ################################################################################
 
