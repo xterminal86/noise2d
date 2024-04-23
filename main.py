@@ -22,9 +22,9 @@ class ProgramData:
   _resolution     = 16;
   _step           = 1;
   _screenSize     = tuple();
-  _drawData       = [];
   _noiseData      = [];
   _debugMode      = True;
+  _fastDraw       = True;
   _maxNoise       = -sys.maxsize;
   _minNoise       = sys.maxsize;
   _animator       = 0.0;
@@ -73,11 +73,12 @@ def ProcessEvents(pd : ProgramData):
         pd._colorSchemeInd += 1;
         pd._colorSchemeInd = (pd._colorSchemeInd % len(pd._colorSchemes));
         print(f"Selected color scheme: { pd._colorSchemes[pd._colorSchemeInd] }");
-        PrepareDrawData(pd);
       elif (pd._displayMode == DisplayMode.STATIC) and (event.key == pygame.K_SPACE):
         PrepareNoiseData(pd);
-        PrepareDrawData(pd);
         print("Recreated");
+      elif event.key == pygame.K_f:
+        pd._fastDraw = not pd._fastDraw;
+        print(f"Fast draw = { pd._fastDraw }");
     elif event.type == pygame.MOUSEBUTTONDOWN:
       if event.button == 1:
         noiseVal = pd._noiseObj.Noise(event.pos[0], event.pos[1]);
@@ -85,34 +86,48 @@ def ProcessEvents(pd : ProgramData):
 
 ################################################################################
 
-def Recreate(pd : ProgramData):
-  pd._animator = pd._noiseObj.Recreate(pd._animator);
-
+def DrawNoise(screen, pd : ProgramData):
+  if pd._displayMode == DisplayMode.ANIMATED:
+    pd._animator = pd._noiseObj.Drive(pd._animator);
+  
   for x in range(pd._screenSize[0]):
     for y in range(pd._screenSize[1]):
-      noiseVal = pd._noiseObj.Noise(x, y);
+      coeff = pd._noiseObj.Noise(x, y) / pd._maxNoise;
+      clr = coeff * 255.0;
+      colorToDraw = NoiseToColor(clr, pd._colorSchemes[pd._colorSchemeInd]);
+      pygame.draw.circle(screen, colorToDraw, (x, y), 1);
 
-      if (noiseVal > pd._maxNoise):
-        pd._maxNoise = noiseVal;
+################################################################################
 
-      if (noiseVal < pd._minNoise):
-        pd._minNoise = noiseVal;
+def DrawFast(screen, pd : ProgramData):
+  nx = 0;
+  ny = 0;
+  
+  step = pd._resolution;
+  
+  if pd._displayMode == DisplayMode.ANIMATED:
+    pd._animator = pd._noiseObj.Drive(pd._animator);
 
-      pd._noiseData[x][y] = noiseVal;
+  for x in range(0, pd._screenSize[0], step):
+    for y in range(0, pd._screenSize[1], step):
+      coeff = pd._noiseObj.Noise(nx, ny) / pd._maxNoise;
+      clr = coeff * 255.0;
+      colorToDraw = NoiseToColor(clr, pd._colorSchemes[pd._colorSchemeInd]);
+      pygame.draw.rect(screen, colorToDraw, pygame.Rect(x, y, step, step));
+      ny += step;
+    nx += step;
+    ny = 0;
 
 ################################################################################
 
 def Draw(screen, pd : ProgramData):
   screen.fill( (0, 0, 0) );
 
-  if pd._displayMode == DisplayMode.ANIMATED:
-    Recreate(pd);
-    PrepareDrawData(pd);
-
-  for x in range(pd._screenSize[0]):
-    for y in range(pd._screenSize[1]):
-      pygame.draw.circle(screen, pd._drawData[x][y], (x, y), 1);
-
+  if pd._fastDraw:
+    DrawFast(screen, pd);
+  else:
+    DrawNoise(screen, pd);
+  
   if pd._debugMode:
     gridColor    = pygame.Color("#AA00AA");
     gradVecColor = pygame.Color("#00AAAA");
@@ -138,24 +153,11 @@ def Draw(screen, pd : ProgramData):
 
 ################################################################################
 
-def PrepareDrawData(pd : ProgramData):
-  for x in range(pd._screenSize[0]):
-    for y in range(pd._screenSize[1]):
-      coeff = pd._noiseData[x][y] / pd._maxNoise;
-      clr = coeff * 255.0;
-      pd._drawData[x][y] = NoiseToColor(clr,
-                                        pd._colorSchemes[pd._colorSchemeInd]);
-
-################################################################################
-
 def PrepareNoiseData(pd : ProgramData):
   pd._noiseObj = Noise2D(pd._resolution,
                          pd._step,
                          pd._gradientMode);
-
-  pd._drawData  = [ [ 0.0 for _ in range(pd._screenSize[1]) ] for _ in range(pd._screenSize[0]) ];
-  pd._noiseData = [ [ 0.0 for _ in range(pd._screenSize[1]) ] for _ in range(pd._screenSize[0]) ];
-
+  
   for x in range(pd._screenSize[0]):
     for y in range(pd._screenSize[1]):
       noiseVal = pd._noiseObj.Noise(x, y);
@@ -183,6 +185,7 @@ def main():
     "Use 'C' to change color scheme. "
     "Use 'G' to toggle gradients type (static mode only). "
     "Press 'H' to toggle debug gizmos. "
+    "Press 'F' to toggle between fast and precise draw. "
     "Press LMB to check noise value under cursor point. "
     "'Escape' to quit. "
   ));
@@ -232,9 +235,10 @@ def main():
   print(f"STEP = { pd._step }");
 
   random.seed(pd._seed);
-
+  
+  pd._noiseData = [ [ 0.0 for _ in range(pd._screenSize[1]) ] for _ in range(pd._screenSize[0]) ];
+  
   PrepareNoiseData(pd);
-  PrepareDrawData(pd);
 
   clock = pygame.time.Clock();
 

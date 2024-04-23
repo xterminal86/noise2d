@@ -64,11 +64,11 @@ class Noise2D:
           GetRandomGradient() if self._gradientMode == GradientMode.GRAD_RND else GetRandomGradient45()
         );
 
-        self._gradientsOffsetsTable[x][y] = random.randint(1, 359);
+        self._gradientsOffsetsTable[x][y] = random.randint(0, 359);
 
   # ----------------------------------------------------------------------------
 
-  def Recreate(self, animator : float) -> float:
+  def Drive(self, animator : float) -> float:
     newAnimatorValue = animator;
 
     for x in range(self._resolution):
