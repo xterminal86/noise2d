@@ -1,6 +1,6 @@
 import math;
 
-from enum  import Enum, auto;
+from enum import Enum, auto;
 
 ################################################################################
 
@@ -44,10 +44,10 @@ def Dot(v1 : tuple, v2 : tuple) -> float:
 
 def NoiseToColor(noiseVal : float) -> tuple:
   if noiseVal < 0.0:
-    val = int(abs(noiseVal));
-    clr = 255 if val > 255 else val;
-    return (clr, 0, 0);
+    val = int(noiseVal);
+    clr = -255 if val < -255 else val;
+    return (255.0, 255.0 + clr, 0.0);
   else:
     val = int(noiseVal);
     clr = 255 if val > 255 else val;
-    return (clr, clr, 0);
+    return (255.0 - clr, 255.0, 0.0);

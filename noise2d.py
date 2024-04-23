@@ -1,98 +1,150 @@
 import math;
 import random;
 
-from utils import Interpolation;
+from noise1d import Noise1D;
+from utils   import Dot, Interpolate, Interpolation;
+
+################################################################################
+
+def GetRandomGradient() -> tuple:
+  rndX = (-1 if random.randint(0, 1) == 1 else 1) * random.random();
+  rndY = (-1 if random.randint(0, 1) == 1 else 1) * random.random();
+
+  ln = math.sqrt(pow(rndX, 2) + pow(rndY, 2));
+
+  return (rndX / ln, rndY / ln);
+
+################################################################################
+
+def GetRandomGradient45() -> tuple:
+  grads = [
+    ( 0.7071067811865475,  0.7071067811865475),
+    (-0.7071067811865475,  0.7071067811865475),
+    (-0.7071067811865475, -0.7071067811865475),
+    ( 0.7071067811865475, -0.7071067811865475)
+  ];
+
+  return random.choice(grads);
 
 ################################################################################
 
 class Noise2D:
-  _rnd     = [];
-  _noise   = [];
-  _size    = 0;
-  _seed    = None;
-  _octaves = 8;
-  _interpolation = Interpolation.LINEAR;
-  _scalingBias = 1.0;
-
+  _gradients  = [];
+  _resolution = 16;
+  _step       = 1
+  _maxVecLen  = 0.0;
+  _noise1d    = None;
+  
   # ----------------------------------------------------------------------------
 
-  def __init__(self,
-               size : int,
-               octaves=8,
-               seed=None,
-               interpolation=Interpolation.LINEAR,
-               scalingBias=1.0):
-    self._seed    = seed;
-    self._size    = size;
-    self._octaves = octaves;
+  def __init__(self, resolution : int, step : int, noiseRnd : Noise1D = None):
+    self._resolution = resolution;
+    self._step       = step;
+    self._noise1d    = noiseRnd;
+    
+    self._maxVecLen = math.sqrt(step * step);
 
-    self._interpolation = interpolation;
+    self._gradients = [ [ 0 for _ in range(resolution) ] for _ in range(resolution) ];
 
-    self._scalingBias = scalingBias;
-
-    if self._scalingBias < 0.1:
-      self._scalingBias = 0.1;
-
-    random.seed(self._seed);
-
-    self.Reset();
-
+    noiseStep = 0.5;
+    point = -(pow(resolution, 2) / 2) * noiseStep;
+    
+    for x in range(resolution):
+      for y in range(resolution):
+        if self._noise1d is not None:
+          p1 = self._noise1d.Noise(point);
+          point += noiseStep;
+          p2 = self._noise1d.Noise(point);
+          point += noiseStep;
+          ln = math.sqrt(pow(p1, 2) + pow(p2, 2));
+          self._gradients[x][y] = (p1 / ln, p2 / ln);
+        else:
+          self._gradients[x][y] = GetRandomGradient();
+          #self._gradients[x][y] = GetRandomGradient45();
+  
   # ----------------------------------------------------------------------------
+  
+  def Noise(self, x : int, y : int) -> float:
+    cellX = x // self._step;
+    cellY = y // self._step;
 
-  def Reset(self):
-    self._rnd   = [ [ 0.0 for _ in range(self._size) ] for _ in range(self._size) ];
-    self._noise = [ [ 0.0 for _ in range(self._size) ] for _ in range(self._size) ];
+    offsetX = (x % self._step);
+    offsetY = (y % self._step);
 
     #
-    # Generate seed array.
+    # step = 10
     #
-    for x in range(self._size):
-      for y in range(self._size):
-        self._rnd[x][y] = random.random();
+    # (0;0)       (10;0)
+    #   x--3------x
+    #   |  .      .
+    #   |  .      .
+    #   |  .      .
+    #   4..P      .
+    #   |         .
+    #   |         .
+    #   |         .
+    #   |         .
+    #   |         .
+    #   x.........x
+    # (0;10)      (10;10)
+    #
+    # UL = ( 0; 0)
+    # UR = (10; 0)
+    # DL = ( 0;10)
+    # DR = (10;10)
+    #
+    # P = (3;4)
+    #
+    # V1 = P
+    # UR + V2 = V1 -> V2 = V1 - UR
+    # DL + V3 = V1 -> V3 = V1 - DL
+    # DR + V4 = V1 -> V4 = V1 - DR
+    #
 
-    for x in range(self._size):
-      for y in range(self._size):
+    V1 = (offsetX,              offsetY);
+    V2 = (offsetX - self._step, offsetY);
+    V3 = (offsetX,              offsetY - self._step);
+    V4 = (offsetX - self._step, offsetY - self._step);
 
-        noise = 0.0;
-        scale = 1.0;
-        normCoeff = 0;
+    #print(f"{ x }, { y } -> ({ cellY }, { cellX }) : ({ offsetX }, { offsetY })");
 
-        for o in range(1, self._octaves):
-          pitch = (self._size >> o);
+    ul = (cellY % self._resolution, cellX % self._resolution);
+    ur = (cellY % self._resolution, (cellX + 1) % self._resolution);
+    dl = ((cellY + 1) % self._resolution, cellX % self._resolution);
+    dr = ((cellY + 1) % self._resolution, (cellX + 1) % self._resolution);
 
-          if pitch == 0:
-            break;
+    #print(f"{ ul } - { ur }");
+    #print(f"|        |");
+    #print(f"{ dl } - { dr }");
+    
+    gul = self._gradients[ ul[0] ][ ul[1] ];
+    gur = self._gradients[ ur[0] ][ ur[1] ];
+    gdl = self._gradients[ dl[0] ][ dl[1] ];
+    gdr = self._gradients[ dr[0] ][ dr[1] ];
 
-          indx1 = (x // pitch) * pitch;
-          indy1 = (y // pitch) * pitch;
+    #print(f"grad ul - { gul }");
+    #print(f"grad ur - { gur }");
+    #print(f"grad dl - { gdl }");
+    #print(f"grad dr - { gdr }");
 
-          indx2 = (indx1 + pitch) % self._size;
-          indy2 = (indy1 + pitch) % self._size;
+    dotV1 = Dot(V1, gul);
+    dotV2 = Dot(V2, gur);
+    dotV3 = Dot(V3, gdl);
+    dotV4 = Dot(V4, gdr);
 
-          blendX = float(x - indx1) / float(pitch);
-          blendY = float(y - indy1) / float(pitch);
+    # print("-"*80);
+    # print(f"{dotV1:8.2f} - {dotV2:8.2f}");
+    # print(f"    |          |");
+    # print(f"{dotV3:8.2f} - {dotV4:8.2f}");
+    # print("-"*80);
 
-          if self._interpolation == Interpolation.LINEAR:
-            sampleX = (1.0 - blendX) * self._rnd[indx1][indy1] + blendX * self._rnd[indx2][indy1];
-            sampleY = (1.0 - blendX) * self._rnd[indx1][indy2] + blendX * self._rnd[indx2][indy2];
-          else:
-            sampleX = (math.cos(blendX * math.pi) + 1) * 0.5 * (self._rnd[indx1][indy1] - self._rnd[indx2][indy1]) + self._rnd[indx2][indy1];
-            sampleY = (math.cos(blendX * math.pi) + 1) * 0.5 * (self._rnd[indx1][indy2] - self._rnd[indx2][indy2]) + self._rnd[indx2][indy2];
+    #res = (dotV1 + dotV2 + dotV3 + dotV4) / 4.0;
 
-          noise += (blendY * (sampleY - sampleX) + sampleX) * scale;
-          normCoeff += scale;
-          scale /= (2.0 * self._scalingBias);
+    r1 = Interpolate(dotV1, dotV2, (offsetX / self._step), Interpolation.COSINE);
+    r2 = Interpolate(dotV3, dotV4, (offsetX / self._step), Interpolation.COSINE);
 
-        #
-        # Rescale result back to [ 0.0 ; 1.0 ]
-        #
-        if normCoeff != 0:
-          self._noise[x][y] = noise / normCoeff;
+    res = Interpolate(r1, r2, (offsetY / self._step), Interpolation.COSINE);
 
-  # ----------------------------------------------------------------------------
+    return res;
 
-  def Noise(self, x : float, y : float) -> float:
-    xx = int(x) % self._size;
-    yy = int(y) % self._size;
-
-    return self._noise[xx][yy];
+################################################################################

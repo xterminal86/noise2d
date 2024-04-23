@@ -4,9 +4,9 @@ import sys;
 
 import pygame;
 
-# from noise2d import Noise2D, Interpolation;
-from noise2d_new import NewNoise2D;
-from utils       import NoiseToColor;
+from noise1d import Noise1D;
+from noise2d import Noise2D;
+from utils   import NoiseToColor;
 
 ################################################################################
 
@@ -17,6 +17,7 @@ class ProgramData:
   _step       = 1;
   _screenSize = tuple();
   _noiseObj   = None;
+  _noiseRnd   = None;
   _drawData   = [];
   _noiseData  = [];
   _debugMode  = True;
@@ -74,6 +75,8 @@ def Draw(screen, pd : ProgramData):
 ################################################################################
 
 def main():
+  global RND1D;
+  
   screenSizeMin = ( 80, 60 );
   maxScaleChoices = [];
 
@@ -127,10 +130,12 @@ def main():
   print(f"STEP = { pd._step }");
 
   random.seed(pd._seed);
-
+  
+  pd._noiseRnd = Noise1D(32, 1.0, pd._seed);
+  
   clock = pygame.time.Clock();
 
-  pd._noiseObj = NewNoise2D(pd._resolution, pd._step);
+  pd._noiseObj = Noise2D(pd._resolution, pd._step, pd._noiseRnd);
 
   pd._drawData  = [ [ 0.0 for _ in range(screenSize[1]) ] for _ in range(screenSize[0]) ];
   pd._noiseData = [ [ 0.0 for _ in range(screenSize[1]) ] for _ in range(screenSize[0]) ];
@@ -165,70 +170,6 @@ def main():
     Draw(screen, pd);
 
   pygame.quit();
-
-  '''
-  bias = 1.0;
-  intpl = Interpolation.LINEAR;
-  noise = Noise2D(size, seed=seed, interpolation=intpl, scalingBias=bias);
-
-  while running:
-
-    clock.tick(60);
-
-    for event in pygame.event.get():
-      if event.type == pygame.QUIT:
-        running = False;
-      elif event.type == pygame.KEYDOWN:
-        if event.key == pygame.K_ESCAPE:
-          running = False;
-        elif event.key == pygame.K_i:
-          if intpl == Interpolation.LINEAR:
-            intpl = Interpolation.COSINE;
-          else:
-            intpl = Interpolation.LINEAR;
-
-          print(intpl);
-
-          noise = Noise2D(size, seed=seed, interpolation=intpl, scalingBias=bias);
-        elif event.key == pygame.K_z:
-          bias -= 0.1;
-
-          if bias < 0.1:
-            bias = 0.1;
-
-          print(f"bias = { bias }");
-
-          noise = Noise2D(size, seed=seed, interpolation=intpl, scalingBias=bias);
-
-        elif event.key == pygame.K_x:
-          bias += 0.1;
-
-          if bias > 2.0:
-            bias = 2.0;
-
-          print(f"bias = { bias }");
-
-          noise = Noise2D(size, seed=seed, interpolation=intpl, scalingBias=bias);
-
-    screen.fill((0,0,0));
-
-    for x in range(screenSize[0]):
-      for y in range(screenSize[1]):
-        c = int(noise.Noise(x, y) * 255);
-        if c > 255:
-          c = 255;
-
-        clr = (c, c, c);
-
-        pygame.draw.circle(screen,
-                           clr,
-                           (x, y),
-                           1);
-
-    pygame.display.flip();
-
-  pygame.quit();
-  '''
 
 ################################################################################
 
