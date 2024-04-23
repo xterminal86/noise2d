@@ -4,25 +4,38 @@ import sys;
 
 import pygame;
 
-from noise1d import Noise1D;
-from noise2d import Noise2D;
-from utils   import NoiseToColor;
+from enum    import Enum, auto;
+from noise2d import Noise2D, GradientMode;
+from utils   import NoiseToColor, ColorScheme;
+
+class DisplayMode(Enum):
+  ANIMATED = auto();
+  STATIC   = auto();
 
 ################################################################################
 
 class ProgramData:
-  _shouldStop = False;
-  _seed       = 1;
-  _resolution = 16;
-  _step       = 1;
-  _screenSize = tuple();
-  _noiseObj   = None;
-  _noiseRnd   = None;
-  _drawData   = [];
-  _noiseData  = [];
-  _debugMode  = True;
-  _maxNoise   = -sys.maxsize;
-  _minNoise   = sys.maxsize;
+  _noiseObj : Noise2D = None;
+
+  _shouldStop     = False;
+  _seed           = 1;
+  _resolution     = 16;
+  _step           = 1;
+  _screenSize     = tuple();
+  _drawData       = [];
+  _noiseData      = [];
+  _debugMode      = True;
+  _maxNoise       = -sys.maxsize;
+  _minNoise       = sys.maxsize;
+  _animator       = 0.0;
+  _displayMode    = DisplayMode.ANIMATED;
+  _gradientMode   = GradientMode.GRAD_RND;
+  _colorSchemes   = [
+    ColorScheme.GREEN_RED,
+    ColorScheme.RED_YELLOW,
+    ColorScheme.CUSTOM
+  ];
+  _colorSchemeInd = 0;
 
 ################################################################################
 
@@ -35,6 +48,36 @@ def ProcessEvents(pd : ProgramData):
         pd._shouldStop = True;
       elif event.key == pygame.K_h:
         pd._debugMode = not pd._debugMode;
+      elif event.key == pygame.K_1:
+        pd._displayMode = DisplayMode.STATIC;
+        print("Display mode = STATIC");
+      elif event.key == pygame.K_2:
+        pd._displayMode = DisplayMode.ANIMATED;
+        print("Display mode = ANIMATED");
+      elif event.key == pygame.K_g:
+        if pd._gradientMode == GradientMode.GRAD_RND:
+          pd._gradientMode = GradientMode.GRAD_45;
+          print("Gradient mode = GRAD_45");
+        else:
+          pd._gradientMode = GradientMode.GRAD_RND;
+          print("Gradient mode = GRAD_RND");
+      elif event.key == pygame.K_EQUALS:
+        pd._noiseObj._animationStep += 0.1;
+        print(f"Animation speed = {pd._noiseObj._animationStep:.2f}");
+      elif event.key == pygame.K_MINUS:
+        pd._noiseObj._animationStep += -0.1;
+        if pd._noiseObj._animationStep < 0.1:
+          pd._noiseObj._animationStep = 0.1;
+        print(f"Animation speed = {pd._noiseObj._animationStep:.2f}");
+      elif event.key == pygame.K_c:
+        pd._colorSchemeInd += 1;
+        pd._colorSchemeInd = (pd._colorSchemeInd % len(pd._colorSchemes));
+        print(f"Selected color scheme: { pd._colorSchemes[pd._colorSchemeInd] }");
+        PrepareDrawData(pd);
+      elif (pd._displayMode == DisplayMode.STATIC) and (event.key == pygame.K_SPACE):
+        PrepareNoiseData(pd);
+        PrepareDrawData(pd);
+        print("Recreated");
     elif event.type == pygame.MOUSEBUTTONDOWN:
       if event.button == 1:
         noiseVal = pd._noiseObj.Noise(event.pos[0], event.pos[1]);
@@ -42,8 +85,29 @@ def ProcessEvents(pd : ProgramData):
 
 ################################################################################
 
+def Recreate(pd : ProgramData):
+  pd._animator = pd._noiseObj.Recreate(pd._animator);
+
+  for x in range(pd._screenSize[0]):
+    for y in range(pd._screenSize[1]):
+      noiseVal = pd._noiseObj.Noise(x, y);
+
+      if (noiseVal > pd._maxNoise):
+        pd._maxNoise = noiseVal;
+
+      if (noiseVal < pd._minNoise):
+        pd._minNoise = noiseVal;
+
+      pd._noiseData[x][y] = noiseVal;
+
+################################################################################
+
 def Draw(screen, pd : ProgramData):
   screen.fill( (0, 0, 0) );
+
+  if pd._displayMode == DisplayMode.ANIMATED:
+    Recreate(pd);
+    PrepareDrawData(pd);
 
   for x in range(pd._screenSize[0]):
     for y in range(pd._screenSize[1]):
@@ -74,16 +138,54 @@ def Draw(screen, pd : ProgramData):
 
 ################################################################################
 
+def PrepareDrawData(pd : ProgramData):
+  for x in range(pd._screenSize[0]):
+    for y in range(pd._screenSize[1]):
+      coeff = pd._noiseData[x][y] / pd._maxNoise;
+      clr = coeff * 255.0;
+      pd._drawData[x][y] = NoiseToColor(clr,
+                                        pd._colorSchemes[pd._colorSchemeInd]);
+
+################################################################################
+
+def PrepareNoiseData(pd : ProgramData):
+  pd._noiseObj = Noise2D(pd._resolution,
+                         pd._step,
+                         pd._gradientMode);
+
+  pd._drawData  = [ [ 0.0 for _ in range(pd._screenSize[1]) ] for _ in range(pd._screenSize[0]) ];
+  pd._noiseData = [ [ 0.0 for _ in range(pd._screenSize[1]) ] for _ in range(pd._screenSize[0]) ];
+
+  for x in range(pd._screenSize[0]):
+    for y in range(pd._screenSize[1]):
+      noiseVal = pd._noiseObj.Noise(x, y);
+
+      if (noiseVal > pd._maxNoise):
+        pd._maxNoise = noiseVal;
+
+      if (noiseVal < pd._minNoise):
+        pd._minNoise = noiseVal;
+
+      pd._noiseData[x][y] = noiseVal;
+
+################################################################################
+
 def main():
-  global RND1D;
-  
   screenSizeMin = ( 80, 60 );
   maxScaleChoices = [];
 
   for i in range(40):
     maxScaleChoices.append(i + 1);
 
-  parser = argparse.ArgumentParser();
+  parser = argparse.ArgumentParser(description=(
+    "Use 1 or 2 to change between static and animatied modes. "
+    "Use '+' or '-' to change animation speed. "
+    "Use 'C' to change color scheme. "
+    "Use 'G' to toggle gradients type (static mode only). "
+    "Press 'H' to toggle debug gizmos. "
+    "Press LMB to check noise value under cursor point. "
+    "'Escape' to quit. "
+  ));
 
   parser.add_argument("RESOLUTION",
                       type=int,
@@ -130,33 +232,11 @@ def main():
   print(f"STEP = { pd._step }");
 
   random.seed(pd._seed);
-  
-  pd._noiseRnd = Noise1D(32, 1.0, pd._seed);
-  
+
+  PrepareNoiseData(pd);
+  PrepareDrawData(pd);
+
   clock = pygame.time.Clock();
-
-  pd._noiseObj = Noise2D(pd._resolution, pd._step, pd._noiseRnd);
-
-  pd._drawData  = [ [ 0.0 for _ in range(screenSize[1]) ] for _ in range(screenSize[0]) ];
-  pd._noiseData = [ [ 0.0 for _ in range(screenSize[1]) ] for _ in range(screenSize[0]) ];
-
-  for x in range(screenSize[0]):
-    for y in range(screenSize[1]):
-      noiseVal = pd._noiseObj.Noise(x, y);
-
-      if (noiseVal > pd._maxNoise):
-        pd._maxNoise = noiseVal;
-
-      if (noiseVal < pd._minNoise):
-        pd._minNoise = noiseVal;
-
-      pd._noiseData[x][y] = noiseVal;
-
-  for x in range(screenSize[0]):
-    for y in range(screenSize[1]):
-      coeff = pd._noiseData[x][y] / pd._maxNoise;
-      clr = coeff * 255.0;
-      pd._drawData[x][y] = NoiseToColor(clr);
 
   print("Noise generation done");
   print(f"Max noise: { pd._maxNoise }");

@@ -1,8 +1,14 @@
 import math;
 import random;
 
-from noise1d import Noise1D;
-from utils   import Dot, Interpolate, Interpolation;
+from enum  import Enum, auto;
+from utils import Dot, Interpolate, Interpolation, VectorFromAngle;
+
+################################################################################
+
+class GradientMode(Enum):
+  GRAD_RND = auto();
+  GRAD_45  = auto();
 
 ################################################################################
 
@@ -33,37 +39,48 @@ class Noise2D:
   _resolution = 16;
   _step       = 1
   _maxVecLen  = 0.0;
-  _noise1d    = None;
-  
+
+  _gradientsOffsetsTable = [];
+
+  _animationStep = 0.1;
+
+  _gradientMode = GradientMode.GRAD_RND;
+
   # ----------------------------------------------------------------------------
 
-  def __init__(self, resolution : int, step : int, noiseRnd : Noise1D = None):
-    self._resolution = resolution;
-    self._step       = step;
-    self._noise1d    = noiseRnd;
-    
+  def __init__(self, resolution : int, step : int, gradientMode : GradientMode = GradientMode.GRAD_RND):
+    self._resolution   = resolution;
+    self._step         = step;
+    self._gradientMode = gradientMode;
+
     self._maxVecLen = math.sqrt(step * step);
 
-    self._gradients = [ [ 0 for _ in range(resolution) ] for _ in range(resolution) ];
+    self._gradients    = [ [ 0 for _ in range(resolution) ] for _ in range(resolution) ];
+    self._gradientsOffsetsTable = [[0 for _ in range(resolution)] for _ in range(resolution)];
 
-    noiseStep = 0.5;
-    point = -(pow(resolution, 2) / 2) * noiseStep;
-    
     for x in range(resolution):
       for y in range(resolution):
-        if self._noise1d is not None:
-          p1 = self._noise1d.Noise(point);
-          point += noiseStep;
-          p2 = self._noise1d.Noise(point);
-          point += noiseStep;
-          ln = math.sqrt(pow(p1, 2) + pow(p2, 2));
-          self._gradients[x][y] = (p1 / ln, p2 / ln);
-        else:
-          self._gradients[x][y] = GetRandomGradient();
-          #self._gradients[x][y] = GetRandomGradient45();
-  
+        self._gradients[x][y] = (
+          GetRandomGradient() if self._gradientMode == GradientMode.GRAD_RND else GetRandomGradient45()
+        );
+
+        self._gradientsOffsetsTable[x][y] = random.randint(1, 359);
+
   # ----------------------------------------------------------------------------
-  
+
+  def Recreate(self, animator : float) -> float:
+    newAnimatorValue = animator;
+
+    for x in range(self._resolution):
+      for y in range(self._resolution):
+        offsetHere = self._gradientsOffsetsTable[x][y];
+        self._gradients[x][y] = VectorFromAngle(newAnimatorValue + offsetHere);
+        newAnimatorValue += self._animationStep;
+
+    return newAnimatorValue;
+
+  # ----------------------------------------------------------------------------
+
   def Noise(self, x : int, y : int) -> float:
     cellX = x // self._step;
     cellY = y // self._step;
@@ -116,7 +133,7 @@ class Noise2D:
     #print(f"{ ul } - { ur }");
     #print(f"|        |");
     #print(f"{ dl } - { dr }");
-    
+
     gul = self._gradients[ ul[0] ][ ul[1] ];
     gur = self._gradients[ ur[0] ][ ur[1] ];
     gdl = self._gradients[ dl[0] ][ dl[1] ];

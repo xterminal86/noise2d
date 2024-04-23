@@ -2,26 +2,10 @@ import math;
 
 from enum import Enum, auto;
 
-################################################################################
-
-class TextAlign(Enum):
-  LEFT   = auto();
-  RIGHT  = auto();
-  CENTER = auto();
-
-def PrintString(screen,
-                font,
-                text,
-                pos : tuple,
-                color : tuple,
-                align : TextAlign = TextAlign.LEFT):
-  ts, s = font.render(text, color);
-  p = pos;
-  if align == TextAlign.RIGHT:
-    p = (pos[0] + s[2], pos[1]);
-  elif align == TextAlign.CENTER:
-    p = (pos[0] - s[2] // 2, pos[1]);
-  screen.blit(ts, p);
+class ColorScheme(Enum):
+  GREEN_RED  = auto();
+  RED_YELLOW = auto();
+  CUSTOM     = auto();
 
 ################################################################################
 
@@ -42,12 +26,32 @@ def Dot(v1 : tuple, v2 : tuple) -> float:
 
 ################################################################################
 
-def NoiseToColor(noiseVal : float) -> tuple:
+def VectorFromAngle(angle : float) -> tuple:
+  x = math.cos(angle * 0.017453292519943295);
+  y = math.sin(angle * 0.017453292519943295);
+
+  ln = math.sqrt(pow(x, 2) + pow(y, 2));
+
+  return (x / ln, y / ln);
+
+################################################################################
+
+def NoiseToColor(noiseVal : float, colorScheme : ColorScheme) -> tuple:
   if noiseVal < 0.0:
     val = int(noiseVal);
     clr = -255 if val < -255 else val;
-    return (255.0, 255.0 + clr, 0.0);
+    if colorScheme == ColorScheme.GREEN_RED:
+      return (255.0, 255.0 + clr, 0.0);
+    elif colorScheme == ColorScheme.RED_YELLOW:
+      return (255.0 + clr, 0.0, 0.0);
+    else:
+      return (0.0, 255.0 + clr, 255.0 + clr);
   else:
     val = int(noiseVal);
     clr = 255 if val > 255 else val;
-    return (255.0 - clr, 255.0, 0.0);
+    if colorScheme == ColorScheme.GREEN_RED:
+      return (255.0 - clr, 255.0, 0.0);
+    elif colorScheme == ColorScheme.RED_YELLOW:
+      return (255.0, clr, 0.0);
+    else:
+      return (0.0, 255.0 - clr, 255.0 - clr);
