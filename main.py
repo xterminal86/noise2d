@@ -89,7 +89,7 @@ def DrawNoise(screen, pd : ProgramData):
     for y in range(pd._screenSize[1]):
       coeff = pd._noiseObj.Noise(x, y) / pd._maxNoise;
       clr = coeff * 255.0;
-      colorToDraw = NoiseToColor(clr, pd._colorSchemes[pd._colorSchemeInd]);
+      colorToDraw = NoiseToColor(clr, ColorSchemes[pd._colorSchemeInd]);
       pygame.draw.circle(screen, colorToDraw, (x, y), 1);
 
 ################################################################################
