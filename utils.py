@@ -5,7 +5,15 @@ from enum import Enum, auto;
 class ColorScheme(Enum):
   GREEN_RED  = auto();
   RED_YELLOW = auto();
+  WIKIPEDIA  = auto();
   CUSTOM     = auto();
+
+ColorSchemes = [
+    ColorScheme.GREEN_RED,
+    ColorScheme.RED_YELLOW,
+    ColorScheme.WIKIPEDIA,
+    ColorScheme.CUSTOM
+];
 
 ################################################################################
 
@@ -44,8 +52,10 @@ def NoiseToColor(noiseVal : float, colorScheme : ColorScheme) -> tuple:
       return (255.0, 255.0 + clr, 0.0);
     elif colorScheme == ColorScheme.RED_YELLOW:
       return (255.0 + clr, 0.0, 0.0);
-    else:
+    elif colorScheme == ColorScheme.CUSTOM:
       return (0.0, 255.0 + clr, 255.0 + clr);
+    else:
+      return (255.0 + clr, 255.0, 255.0 + clr);
   else:
     val = int(noiseVal);
     clr = 255 if val > 255 else val;
@@ -53,5 +63,7 @@ def NoiseToColor(noiseVal : float, colorScheme : ColorScheme) -> tuple:
       return (255.0 - clr, 255.0, 0.0);
     elif colorScheme == ColorScheme.RED_YELLOW:
       return (255.0, clr, 0.0);
-    else:
+    elif colorScheme == ColorScheme.CUSTOM:
       return (0.0, 255.0 - clr, 255.0 - clr);
+    else:
+      return (255.0, 255.0 - clr, 255.0);
