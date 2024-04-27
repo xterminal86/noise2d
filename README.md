@@ -25,5 +25,9 @@ options:
                         Screen size scale factor. Default: 10
 ```
 
-![](animation.gif)
-![](noise-gradients.gif)
+<TABLE>
+  <TR>
+    <TD><IMG src="animation.gif" title="circular"></TD>
+    <TD><IMG src="noise-gradients.gif" title="noise driven"></TD>
+  </TR>
+</TABLE>
