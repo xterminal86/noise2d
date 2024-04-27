@@ -38,9 +38,7 @@ def VectorFromAngle(angle : float) -> tuple:
   x = math.cos(angle * 0.017453292519943295);
   y = math.sin(angle * 0.017453292519943295);
 
-  ln = math.sqrt(pow(x, 2) + pow(y, 2));
-
-  return (x / ln, y / ln);
+  return (x, y);
 
 ################################################################################
 

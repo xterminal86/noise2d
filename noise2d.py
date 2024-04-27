@@ -1,8 +1,9 @@
 import math;
 import random;
 
-from enum  import Enum, auto;
-from utils import Dot, Interpolate, Interpolation, VectorFromAngle;
+from noise1d import Noise1D;
+from enum    import Enum, auto;
+from utils   import Dot, Interpolate, Interpolation, VectorFromAngle;
 
 ################################################################################
 
@@ -41,7 +42,9 @@ class Noise2D:
   _maxVecLen  = 0.0;
 
   _gradientsOffsetsTable = [];
-
+  
+  _noise1dRef : Noise1D = None;
+  
   _animationStep = 0.1;
 
   _gradientMode = GradientMode.GRAD_RND;
@@ -56,8 +59,10 @@ class Noise2D:
     self._maxVecLen = math.sqrt(step * step);
 
     self._gradients    = [ [ 0 for _ in range(resolution) ] for _ in range(resolution) ];
-    self._gradientsOffsetsTable = [[0 for _ in range(resolution)] for _ in range(resolution)];
-
+    self._gradientsOffsetsTable = [ [ 0 for _ in range(resolution) ] for _ in range(resolution) ];
+    
+    cnt = 0;
+    
     for x in range(resolution):
       for y in range(resolution):
         self._gradients[x][y] = (
@@ -67,16 +72,31 @@ class Noise2D:
         self._gradientsOffsetsTable[x][y] = random.randint(0, 359);
 
   # ----------------------------------------------------------------------------
-
-  def Drive(self, animator : float) -> float:
+  
+  def GetGradientFromNoise(self, animator : float) -> tuple:
+    noiseVal = self._noise1dRef.Noise(animator,
+                                      self._noise1dRef._interpolationMode);
+    
+    cx = math.cos(noiseVal);
+    cy = math.sin(noiseVal);
+    
+    return (cx, cy);
+  
+  # ----------------------------------------------------------------------------
+  
+  def Drive(self, animator : float, fromNoise : bool) -> float:
     newAnimatorValue = animator;
-
+    
     for x in range(self._resolution):
       for y in range(self._resolution):
         offsetHere = self._gradientsOffsetsTable[x][y];
-        self._gradients[x][y] = VectorFromAngle(newAnimatorValue + offsetHere);
-        newAnimatorValue += self._animationStep;
-
+        if fromNoise:
+          self._gradients[x][y] = self.GetGradientFromNoise(newAnimatorValue + offsetHere);
+          newAnimatorValue += 0.0005;
+        else:
+          self._gradients[x][y] = VectorFromAngle(newAnimatorValue + offsetHere);
+          newAnimatorValue += self._animationStep;
+    
     return newAnimatorValue;
 
   # ----------------------------------------------------------------------------
@@ -156,12 +176,12 @@ class Noise2D:
     # print("-"*80);
 
     #res = (dotV1 + dotV2 + dotV3 + dotV4) / 4.0;
-
+   
     r1 = Interpolate(dotV1, dotV2, (offsetX / self._step), Interpolation.COSINE);
     r2 = Interpolate(dotV3, dotV4, (offsetX / self._step), Interpolation.COSINE);
 
     res = Interpolate(r1, r2, (offsetY / self._step), Interpolation.COSINE);
-
+    
     return res;
 
 ################################################################################

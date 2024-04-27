@@ -6,9 +6,11 @@ usage: main.py [-h] [--seed SEED] [--debug]
 Use 1 or 2 to change between static and animatied modes. 
 Use '+' or '-' to change animation speed. 
 Use 'C' to change color scheme. 
-Use 'G' to toggle gradients type (static mode only).
-Press 'H' to toggle debug gizmos.
-Press 'F' to toggle between fast and precise draw.
+Use 'G' to toggle gradients type (static mode only). 
+Press 'H' to toggle debug gizmos. 
+Press 'F' to toggle between fast and precise draw. 
+Press 'N' to toggle between circular / noise gradient vectors. 
+Press 'I' to toggle noise interpolation mode (noise gradients only).
 Press LMB to check noise value under cursor point. 
 'Escape' to quit.
 
@@ -24,3 +26,4 @@ options:
 ```
 
 ![](animation.gif)
+![](noise-gradients.gif)

@@ -5,8 +5,9 @@ import sys;
 import pygame;
 
 from enum    import Enum, auto;
+from noise1d import Noise1D;
 from noise2d import Noise2D, GradientMode;
-from utils   import NoiseToColor, ColorSchemes;
+from utils   import NoiseToColor, ColorSchemes, Interpolation;
 
 class DisplayMode(Enum):
   ANIMATED = auto();
@@ -15,9 +16,14 @@ class DisplayMode(Enum):
 ################################################################################
 
 class ProgramData:
-  _noiseObj : Noise2D = None;
-
-  _shouldStop     = False;
+  _noiseObj   : Noise2D = None;
+  _noiseObj1d : Noise1D = None;
+  
+  _shouldStop        = False;
+  _driveFromNoise    = False;
+  
+  _noise1dInterpolation = Interpolation.LINEAR;
+  
   _seed           = 1;
   _resolution     = 16;
   _step           = 1;
@@ -28,6 +34,7 @@ class ProgramData:
   _maxNoise       = -sys.maxsize;
   _minNoise       = sys.maxsize;
   _animator       = 0.0;
+  _scale          = 1;
   _displayMode    = DisplayMode.ANIMATED;
   _gradientMode   = GradientMode.GRAD_RND;
   _colorSchemeInd = 0;
@@ -74,6 +81,14 @@ def ProcessEvents(pd : ProgramData):
       elif event.key == pygame.K_f:
         pd._fastDraw = not pd._fastDraw;
         print(f"Fast draw = { pd._fastDraw }");
+      elif event.key == pygame.K_n:
+        pd._driveFromNoise = not pd._driveFromNoise;
+        print(f"Drive from noise = { pd._driveFromNoise }");
+      elif event.key == pygame.K_i:
+        if pd._driveFromNoise:
+          pd._noise1dInterpolation = Interpolation.LINEAR if pd._noise1dInterpolation == Interpolation.COSINE else Interpolation.COSINE;
+          pd._noiseObj1d._interpolationMode = pd._noise1dInterpolation;
+          print(f"Noise 1D interpolation mode = { pd._noise1dInterpolation }");
     elif event.type == pygame.MOUSEBUTTONDOWN:
       if event.button == 1:
         noiseVal = pd._noiseObj.Noise(event.pos[0], event.pos[1]);
@@ -83,7 +98,7 @@ def ProcessEvents(pd : ProgramData):
 
 def DrawNoise(screen, pd : ProgramData):
   if pd._displayMode == DisplayMode.ANIMATED:
-    pd._animator = pd._noiseObj.Drive(pd._animator);
+    pd._animator = pd._noiseObj.Drive(pd._animator, pd._driveFromNoise);
 
   for x in range(pd._screenSize[0]):
     for y in range(pd._screenSize[1]):
@@ -98,10 +113,13 @@ def DrawFast(screen, pd : ProgramData):
   nx = 0;
   ny = 0;
 
-  step = pd._resolution;
+  step = pd._scale;
+  
+  if step > 8:
+    step = step // 2;
 
   if pd._displayMode == DisplayMode.ANIMATED:
-    pd._animator = pd._noiseObj.Drive(pd._animator);
+    pd._animator = pd._noiseObj.Drive(pd._animator, pd._driveFromNoise);
 
   for x in range(0, pd._screenSize[0], step):
     for y in range(0, pd._screenSize[1], step):
@@ -152,7 +170,11 @@ def PrepareNoiseData(pd : ProgramData):
   pd._noiseObj = Noise2D(pd._resolution,
                          pd._step,
                          pd._gradientMode);
-
+     
+  pd._noiseObj1d = Noise1D(pd._resolution ** 2, 1.0, pd._seed);
+  
+  pd._noiseObj._noise1dRef = pd._noiseObj1d;
+  
   for x in range(pd._screenSize[0]):
     for y in range(pd._screenSize[1]):
       noiseVal = pd._noiseObj.Noise(x, y);
@@ -181,6 +203,8 @@ def main():
     "Use 'G' to toggle gradients type (static mode only). "
     "Press 'H' to toggle debug gizmos. "
     "Press 'F' to toggle between fast and precise draw. "
+    "Press 'N' to toggle between circular / noise gradient vectors. "
+    "Press 'I' to toggle noise interpolation mode (noise gradients only). "
     "Press LMB to check noise value under cursor point. "
     "'Escape' to quit. "
   ));
@@ -202,18 +226,19 @@ def main():
                       help="Screen size scale factor. Default: 10");
 
   args = parser.parse_args();
-
-  scale = args.scale;
-
+  
   pygame.init();
 
   pygame.display.set_caption("noise2d demo");
-
-  screenSize = ( screenSizeMin[0] * scale, screenSizeMin[1] * scale );
+  
+  pd = ProgramData();
+  
+  pd._scale = args.scale;
+  
+  screenSize = ( screenSizeMin[0] * pd._scale, screenSizeMin[1] * pd._scale );
 
   screen = pygame.display.set_mode(screenSize);
-
-  pd = ProgramData();
+  
   pd._resolution = args.RESOLUTION;
   pd._debugMode  = args.debug;
 
